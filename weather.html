@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather App with Interactive Map</title>
+  
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { margin: 0; padding: 20px; background-color: #eef2f5; }
+    
+    .container {
+      max-width: 950px;
+      margin: 0 auto;
+      background: white;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+
+    .search-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus { border-color: #007bff; }
+
+    button {
+      padding: 12px 24px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      transition: background-color 0.2s;
+    }
+
+    button:hover { background-color: #0056b3; }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+      .content-grid { grid-template-columns: 1fr; }
+    }
+
+    .weather-info {
+      background: #f8fafc;
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .temp-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .temp { font-size: 3rem; font-weight: bold; color: #1e293b; margin: 0; }
+    .weather-icon { width: 64px; height: 64px; }
+
+    .details p { margin: 8px 0; color: #475569; font-size: 15px; }
+
+    .forecast-section {
+      margin-top: 20px;
+      background: #f8fafc;
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .forecast-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .forecast-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 8px;
+      text-align: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+
+    .forecast-day {
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 6px;
+    }
+
+    .forecast-icon {
+      width: 48px;
+      height: 48px;
+      margin: 4px 0;
+    }
+
+    .forecast-temp {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+
+    .forecast-desc {
+      font-size: 0.8rem;
+      color: #64748b;
+      line-height: 1.3;
+    }
+
+    .weather-visual {
+      position: relative;
+      height: 120px;
+      margin-bottom: 14px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: linear-gradient(180deg, #7dd3fc, #f8fafc);
+    }
+
+    .weather-visual.sunny {
+      background: linear-gradient(180deg, #38bdf8, #fde68a);
+    }
+
+    .weather-visual.cloudy {
+      background: linear-gradient(180deg, #cbd5e1, #f8fafc);
+    }
+
+    .weather-visual.rainy {
+      background: linear-gradient(180deg, #64748b, #0f172a);
+    }
+
+    .weather-visual.stormy {
+      background: linear-gradient(180deg, #334155, #111827);
+    }
+
+    .weather-visual.snowy {
+      background: linear-gradient(180deg, #dbeafe, #f8fafc);
+    }
+
+    .weather-visual.misty {
+      background: linear-gradient(180deg, #cbd5e1, #e2e8f0);
+    }
+
+    .sky-glow {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 75% 20%, rgba(255,255,255,0.4), transparent 30%);
+    }
+
+    .sun {
+      position: absolute;
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      right: 24px;
+      top: 18px;
+      background: radial-gradient(circle, #fef3c7, #f59e0b);
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+      display: none;
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    .weather-visual.sunny .sun {
+      display: block;
+    }
+
+    .cloud {
+      position: absolute;
+      background: rgba(255,255,255,0.9);
+      border-radius: 999px;
+      display: none;
+      animation: drift 8s linear infinite;
+    }
+
+    .cloud::before,
+    .cloud::after {
+      content: '';
+      position: absolute;
+      background: inherit;
+      border-radius: 50%;
+    }
+
+    .cloud::before {
+      width: 24px;
+      height: 24px;
+      left: 8px;
+      top: -10px;
+    }
+
+    .cloud::after {
+      width: 34px;
+      height: 34px;
+      right: 8px;
+      top: -16px;
+    }
+
+    .cloud-1 {
+      width: 72px;
+      height: 28px;
+      left: 24px;
+      top: 34px;
+    }
+
+    .cloud-2 {
+      width: 56px;
+      height: 24px;
+      left: 104px;
+      top: 56px;
+      animation-duration: 10s;
+    }
+
+    .weather-visual.cloudy .cloud,
+    .weather-visual.rainy .cloud,
+    .weather-visual.stormy .cloud,
+    .weather-visual.snowy .cloud,
+    .weather-visual.misty .cloud {
+      display: block;
+    }
+
+    .weather-visual.sunny .cloud {
+      display: none;
+    }
+
+    .rain,
+    .snow,
+    .lightning {
+      position: absolute;
+      inset: 0;
+      display: none;
+    }
+
+    .weather-visual.rainy .rain {
+      display: block;
+    }
+
+    .weather-visual.snowy .snow {
+      display: block;
+    }
+
+    .weather-visual.stormy .lightning {
+      display: block;
+    }
+
+    .rain span,
+    .snow span {
+      position: absolute;
+      top: -12px;
+      left: calc(var(--i) * 7%);
+      width: 2px;
+      height: 16px;
+      background: rgba(255,255,255,0.75);
+      animation: fall 1s linear infinite;
+      animation-delay: calc(var(--i) * 0.08s);
+    }
+
+    .snow span {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: white;
+      animation: snowFall 2.2s linear infinite;
+      animation-delay: calc(var(--i) * 0.12s);
+    }
+
+    .lightning {
+      background: linear-gradient(180deg, transparent, rgba(255,255,255,0.15), transparent);
+      animation: flash 1.2s infinite;
+    }
+
+    #map {
+      height: 420px;
+      border-radius: 12px;
+      border: 1px solid #cbd5e1;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+
+    @keyframes drift {
+      0% { transform: translateX(0); }
+      50% { transform: translateX(12px); }
+      100% { transform: translateX(0); }
+    }
+
+    @keyframes fall {
+      0% { transform: translateY(0); opacity: 0; }
+      10% { opacity: 1; }
+      100% { transform: translateY(140px); opacity: 0; }
+    }
+
+    @keyframes snowFall {
+      0% { transform: translateY(0) translateX(0); opacity: 0; }
+      10% { opacity: 1; }
+      100% { transform: translateY(140px) translateX(8px); opacity: 0; }
+    }
+
+    @keyframes flash {
+      0%, 95%, 100% { opacity: 0; }
+      96% { opacity: 0.8; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2 style="margin-top: 0; color: #1e293b;">Live Weather Dashboard</h2>
+    
+    <div class="search-box">
+      <input type="text" id="cityInput" placeholder="Enter city name..." value="Jaipur">
+      <button onclick="getWeatherByCity()">Search</button>
+    </div>
+
+    <div class="content-grid">
+      <!-- Weather Details -->
+      <div class="weather-info" id="weatherCard">
+        <h3>Search for a city</h3>
+        <p>Weather data will appear here.</p>
+      </div>
+
+      <!-- Leaflet Map -->
+      <div id="map"></div>
+    </div>
+
+    <div class="forecast-section">
+      <h3 style="margin: 0 0 4px 0; color: #1e293b;">5–7 Day Forecast</h3>
+      <div id="forecastGrid" class="forecast-grid">
+        <p style="margin: 0; color: #64748b;">Forecast will appear here.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet Map JavaScript -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const apiKey = '094c2a887fbe95c2ccec2a4587fdd0d1'; 
+
+    // 1. Initialize Map
+    const map = L.map('map').setView([26.9124, 75.7873], 10);
+    
+    // Base OSM Layer
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Weather Layers (OWM Map Tiles)
+    const tempLayer = L.tileLayer(`https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${apiKey}`);
+    const precipitationLayer = L.tileLayer(`https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${apiKey}`);
+    const cloudsLayer = L.tileLayer(`https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${apiKey}`);
+
+    // Map Layer Controls
+    const overlayMaps = {
+      "Temperature": tempLayer,
+      "Precipitation / Rain": precipitationLayer,
+      "Clouds": cloudsLayer
+    };
+
+    L.control.layers(null, overlayMaps).addTo(map);
+
+    let currentMarker;
+
+    // Enter Key Trigger
+    document.getElementById('cityInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') getWeatherByCity();
+    });
+
+    // 2. Fetch Weather by City Name
+    async function getWeatherByCity() {
+      const city = document.getElementById('cityInput').value.trim();
+      if (!city) return;
+
+      try {
+        const geocodeUrl = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city)}&limit=1&appid=${apiKey}`;
+        const geocodeResponse = await fetch(geocodeUrl);
+        if (!geocodeResponse.ok) throw new Error('City not found');
+
+        const geocodeData = await geocodeResponse.json();
+        if (!geocodeData.length) throw new Error('City not found');
+
+        const { lat, lon, name, state, country } = geocodeData[0];
+        const displayName = [name, state, country].filter(Boolean).join(', ');
+
+        fetchWeatherDataByCoords(lat, lon, displayName);
+      } catch (error) {
+        const weatherCard = document.getElementById('weatherCard');
+        const forecastGrid = document.getElementById('forecastGrid');
+        weatherCard.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        forecastGrid.innerHTML = `<p style="margin: 0; color: red;">${error.message}</p>`;
+      }
+    }
+
+    async function fetchWeatherDataByCoords(lat, lon, locationLabel = '') {
+      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`;
+      fetchWeatherData(url, locationLabel);
+    }
+
+    // 3. Fetch Weather by Coordinates (When clicking map)
+    map.on('click', function(e) {
+      const { lat, lng } = e.latlng;
+      fetchWeatherDataByCoords(lat, lng);
+    });
+
+    // 4. Core Weather Fetch & Render Logic
+    async function fetchWeatherData(url, locationLabel = '') {
+      const weatherCard = document.getElementById('weatherCard');
+      const forecastGrid = document.getElementById('forecastGrid');
+      weatherCard.innerHTML = `<p>Loading weather data...</p>`;
+      forecastGrid.innerHTML = `<p style="margin: 0; color: #64748b;">Loading forecast...</p>`;
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Location not found");
+
+        const data = await response.json();
+        const { lat, lon } = data.coord;
+        const iconCode = data.weather[0].icon;
+        const conditionClass = getWeatherAnimationClass(data.weather[0].main);
+        const displayLocation = locationLabel || [data.name, data.sys.country].filter(Boolean).join(', ');
+
+        // Render Card UI with Weather Icon
+        weatherCard.innerHTML = `
+          <div class="weather-visual ${conditionClass}">
+            <div class="sky-glow"></div>
+            <div class="sun"></div>
+            <div class="cloud cloud-1"></div>
+            <div class="cloud cloud-2"></div>
+            <div class="rain">${Array.from({ length: 14 }, (_, i) => `<span style="--i:${i}"></span>`).join('')}</div>
+            <div class="snow">${Array.from({ length: 14 }, (_, i) => `<span style="--i:${i}"></span>`).join('')}</div>
+            <div class="lightning"></div>
+          </div>
+          <h3 style="margin: 0 0 10px 0;">${displayLocation}</h3>
+          <div class="temp-wrapper">
+            <span class="temp">${Math.round(data.main.temp)}°C</span>
+            <img class="weather-icon" src="https://openweathermap.org/img/wn/${iconCode}@2x.png" alt="Weather Icon">
+          </div>
+          <div class="details">
+            <p><b>Condition:</b> ${data.weather[0].description}</p>
+            <p><b>Feels Like:</b> ${Math.round(data.main.feels_like)}°C</p>
+            <p><b>Humidity:</b> ${data.main.humidity}%</p>
+            <p><b>Wind Speed:</b> ${data.wind.speed} m/s</p>
+          </div>
+        `;
+
+        // Pan Map & Set Marker
+        map.setView([lat, lon], 11);
+
+        if (currentMarker) map.removeLayer(currentMarker);
+
+        currentMarker = L.marker([lat, lon])
+          .addTo(map)
+          .bindPopup(`<b>${data.name || 'Location'}</b><br>${Math.round(data.main.temp)}°C - ${data.weather[0].main}`)
+          .openPopup();
+
+        await fetchForecastData(lat, lon);
+
+      } catch (error) {
+        weatherCard.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        forecastGrid.innerHTML = `<p style="margin: 0; color: red;">${error.message}</p>`;
+      }
+    }
+
+    function getWeatherAnimationClass(main) {
+      const condition = (main || '').toLowerCase();
+      if (condition.includes('clear')) return 'sunny';
+      if (condition.includes('cloud')) return 'cloudy';
+      if (condition.includes('rain') || condition.includes('drizzle')) return 'rainy';
+      if (condition.includes('snow')) return 'snowy';
+      if (condition.includes('thunder') || condition.includes('storm')) return 'stormy';
+      if (condition.includes('mist') || condition.includes('fog') || condition.includes('haze')) return 'misty';
+      return 'cloudy';
+    }
+
+    async function fetchForecastData(lat, lon) {
+      const forecastGrid = document.getElementById('forecastGrid');
+
+      try {
+        const response = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`);
+        if (!response.ok) throw new Error('Forecast unavailable');
+
+        const data = await response.json();
+        const dailyForecasts = buildDailyForecasts(data.list);
+
+        forecastGrid.innerHTML = dailyForecasts.map(item => `
+          <div class="forecast-card">
+            <div class="forecast-day">${item.day}</div>
+            <img class="forecast-icon" src="https://openweathermap.org/img/wn/${item.icon}@2x.png" alt="${item.description}">
+            <div class="forecast-temp">${Math.round(item.tempMax)}° / ${Math.round(item.tempMin)}°C</div>
+            <div class="forecast-desc">${item.description}</div>
+          </div>
+        `).join('');
+      } catch (error) {
+        forecastGrid.innerHTML = `<p style="margin: 0; color: red;">${error.message}</p>`;
+      }
+    }
+
+    function buildDailyForecasts(list) {
+      const dailyMap = {};
+
+      list.forEach(entry => {
+        const date = entry.dt_txt.split(' ')[0];
+        if (!dailyMap[date]) dailyMap[date] = [];
+        dailyMap[date].push(entry);
+      });
+
+      return Object.keys(dailyMap)
+        .slice(0, 7)
+        .map(date => {
+          const entries = dailyMap[date];
+          const middayEntry = entries.find(entry => entry.dt_txt.includes('12:00:00')) || entries[Math.floor(entries.length / 2)] || entries[0];
+          const tempMinValues = entries.map(entry => entry.main.temp_min);
+          const tempMaxValues = entries.map(entry => entry.main.temp_max);
+
+          return {
+            day: new Date(date).toLocaleDateString('en', { weekday: 'short' }),
+            icon: middayEntry.weather[0].icon,
+            description: middayEntry.weather[0].description,
+            tempMin: Math.min(...tempMinValues),
+            tempMax: Math.max(...tempMaxValues)
+          };
+        });
+    }
+
+    // Initial Load
+    getWeatherByCity();
+  </script>
+</body>
+</html>
